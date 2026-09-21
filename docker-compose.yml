@@ -1,0 +1,23 @@
+services:
+  torrent-speedtest:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/torrent-speedtest:latest
+    container_name: torrent-speedtest
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+      - "${PEER_PORT:-51413}:51413"
+      - "${PEER_PORT:-51413}:51413/udp"
+    environment:
+      - PUBLIC_HOST=${PUBLIC_HOST:-auto}
+      - HTTP_PORT=8080
+      - PEER_PORT=51413
+      - FILE_SIZE_GB=${FILE_SIZE_GB:-5.0}
+      - PIECE_SIZE_MB=${PIECE_SIZE_MB:-4}
+    volumes:
+      - torrent_data:/data
+
+volumes:
+  torrent_data:
