@@ -6,23 +6,99 @@ Designed for testing and saturating high-bandwidth network pipes (e.g. 1 Gbps â€
 
 ---
 
-## Architecture
+## Architecture & Data Flow
 
+### System Components
+
+```mermaid
+flowchart LR
+    subgraph ClientHost["User Workstation"]
+        Browser["Web Browser"]
+        TorrentClient["BitTorrent Client (e.g. qBittorrent)"]
+    end
+
+    subgraph Container["Podman Container (torrent-speedtest)"]
+        subgraph WebStack["Python Web & Tracker Service (:8080)"]
+            WebUI["Web Dashboard (HTML / JS)"]
+            Tracker["HTTP Tracker (/announce, BEP 0003)"]
+            StatsAPI["Telemetry API (/api/stats)"]
+        end
+
+        subgraph SeederDaemon["Transmission Headless Daemon"]
+            Seeder["Transmission Engine (:51413 TCP/UDP)"]
+            RPC["Transmission JSON-RPC (:9091)"]
+        end
+
+        subgraph Storage["Persistent Volume (/data)"]
+            DummyFile["speedtest-5gb.bin (5 GB)"]
+            TorrentFile["speedtest-5gb.torrent"]
+        end
+    end
+
+    Browser -->|"1. Download .torrent / Magnet (:8080)"| WebUI
+    Browser -.->|"Live Bandwidth Telemetry (:8080)"| StatsAPI
+    StatsAPI <-->|"Poll Transfer Stats"| RPC
+    TorrentClient -->|"2. Tracker Announce (:8080)"| Tracker
+    Tracker -.->|"Returns Seeder IP & Port"| TorrentClient
+    TorrentClient <===>|"3. Full-Speed Piece Transfer (:51413 TCP/UDP)"| Seeder
+    Seeder -->|"Read Blocks"| DummyFile
 ```
-                                  +------------------------------------------------------+
-                                  |                 Podman Container                     |
-                                  |                                                      |
- [User Browser] ----------------->|  :8080 (TCP)  Web UI                                 |
- (Visits web page & downloads)    |               - Download 5GB .torrent & Magnet Link  |
-                                  |               - Real-time Seeder & Bandwidth Stats   |
-                                  |                                                      |
- [User BitTorrent Client] ------->|  :8080 (TCP)  Python HTTP Tracker (/announce)        |
- (qBittorrent, Transmission, etc.)|               - Resolves Seeder Public IP & Port     |
-                                  |                                                      |
- [User BitTorrent Client] =======>|  :51413 (TCP/UDP) Transmission Seeder Daemon         |
- (High-speed multi-socket dl)     |                   - Seeds generated 5GB test file    |
-                                  |                   - Zero speed caps / 256 slots      |
-                                  +------------------------------------------------------+
+
+---
+
+### Speed Test Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Browser as Browser
+    participant Client as BitTorrent Client
+    participant Tracker as Python Tracker (:8080)
+    participant Seeder as Transmission (:51413)
+
+    User->>Browser: Visit http://<VPS_IP>:8080/
+    Browser->>Tracker: GET /speedtest-5gb.torrent
+    Tracker-->>Browser: Dynamic .torrent with current Host announce URL
+    User->>Client: Open downloaded .torrent / Magnet
+    Client->>Tracker: GET /announce?info_hash=...&peer_id=...&left=5368709120&compact=1
+    Tracker-->>Client: Bencoded Response: [Seeder Public IP + Port 51413]
+    Client->>Seeder: TCP/uTP Handshake + Bitfield Exchange
+    loop High-Speed Transfer
+        Client->>Seeder: Request Piece Chunks (4 MB blocks)
+        Seeder-->>Client: Data Payload Chunks (Saturates Connection)
+    end
+    Client->>Tracker: GET /announce?event=completed&left=0
+    Tracker-->>Client: Acknowledged
+    Note over Client: User observes download speed graph
+    Browser->>Tracker: GET /api/stats (Real-time live telemetry)
+    Tracker-->>Browser: Updated Upload Speed & Active Leechers
+```
+
+---
+
+### Startup & Priming Lifecycle
+
+```mermaid
+flowchart TD
+    Start(["Container Boot (entrypoint.sh)"]) --> LoadEnv["Read Environment Variables (PUBLIC_HOST, FILE_SIZE_GB, etc.)"]
+    LoadEnv --> StartTrans["Start Transmission Daemon (Uncapped, DHT disabled)"]
+    StartTrans --> WaitRPC{"Wait for RPC (:9091) Ready"}
+    WaitRPC -- Waiting --> WaitRPC
+    WaitRPC -- Ready --> CheckFiles{"/data/speedtest-5gb.bin exists?"}
+
+    CheckFiles -- No --> GenFile["Generate 5 GB Pseudo-Random Data (~15s)"]
+    GenFile --> HashPieces["Compute SHA-1 Hashes (1280 x 4MB pieces)"]
+    HashPieces --> WriteTorrent["Write speedtest-5gb.torrent & Metadata"]
+    WriteTorrent --> PrimeTrans["Add Torrent to Transmission via JSON-RPC"]
+
+    CheckFiles -- Yes --> LoadMeta["Load Existing Metadata"]
+    LoadMeta --> PrimeTrans
+
+    PrimeTrans --> VerifyTorrent["Verify Local 100% Integrity & Start Seeding"]
+    VerifyTorrent --> DetectIP["Detect Public IPv4 (or resolve PUBLIC_HOST)"]
+    DetectIP --> LaunchServer["Launch Python Web UI & Tracker (:8080)"]
+    LaunchServer --> Ready(["Container Ready for Speed Tests"])
 ```
 
 ---
@@ -33,7 +109,7 @@ Designed for testing and saturating high-bandwidth network pipes (e.g. 1 Gbps â€
 - **Private BitTorrent Flag**: Ensures BitTorrent clients only connect directly to your test server without advertising on DHT or PEX.
 - **Embedded Python HTTP Tracker**: Implements BEP 0003 compact peer format, automatically directing downloading clients to the container's public IP and seeder port.
 - **Dynamic Announce URL Injection**: When a user downloads `/speedtest-5gb.torrent`, the server dynamically tailors the announce URL to the client's connection host or configured `PUBLIC_HOST`.
-- **Integrated Seeder Daemon**: Pre-tuned headless Transmission instance running in the background with uncapped upload bandwidth and high peer limits.
+- **Integrated Seeder Daemon**: Pre-tuned headless Transmission instance running in the background with uncapped upload bandwidth, 256 upload slots, and high peer limits.
 - **Modern Responsive Web UI**: Dark mode dashboard displaying live seeder upload speed (MB/s and Mbps), cumulative data transferred, and active leecher count.
 - **Podman & Docker Native**: Built on Alpine Linux with zero third-party Python dependencies (runs on pure Python 3 standard library).
 
@@ -119,7 +195,7 @@ Set these environment variables when running the container:
 
 ---
 
-## How to Test
+## How to Run a Speed Test
 
 1. Open your browser and navigate to `http://<YOUR_VPS_IP_OR_HOST>:8080`.
 2. Click **Download 5GB .torrent** (or copy the **Magnet Link**).
