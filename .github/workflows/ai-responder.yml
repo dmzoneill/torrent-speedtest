@@ -1,0 +1,61 @@
+---
+name: AI Issue and PR Responder
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to test response on"
+        required: false
+        default: "13"
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  ai-respond:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Google credentials
+        env:
+          OPENCODE_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        if: env.OPENCODE_KEY == '' && env.GOOGLE_CREDS != ''
+        run: echo "$GOOGLE_CREDS" > /tmp/gcloud-credentials.json
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Download AI responder script
+        run: |
+          curl -sSL "https://raw.githubusercontent.com/dmzoneill/dmzoneill/main/ai-responder.py" -o ai-responder.py
+          chmod +x ai-responder.py
+
+      - name: Run AI responder
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_MODEL: ${{ secrets.OPENCODE_MODEL || 'big-pickle' }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcloud-credentials.json
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event_name == 'issues' && github.event.issue.number || inputs.issue_number || '' }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || '' }}
+          ISSUE_REPO_URL: "https://github.com/${{ github.repository }}"
+          EVENT_TYPE: ${{ github.event_name == 'pull_request' && 'pull_request' || 'issue' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ISSUES_CHAT_ID: ${{ secrets.TELEGRAM_ISSUES_CHAT_ID }}
+          TELEGRAM_PR_CHAT_ID: ${{ secrets.TELEGRAM_PR_CHAT_ID }}
+        run: python ai-responder.py
