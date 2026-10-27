@@ -146,7 +146,7 @@ podman build -t torrent-speedtest .
 podman run -d \
   --name torrent-speedtest \
   --restart unless-stopped \
-  -p 8080:8080 \
+  -p 80.0.9080 \
   -p 51413:51413 \
   -p 51413:51413/udp \
   -v torrent_data:/data \
@@ -159,7 +159,7 @@ podman run -d \
 podman run -d \
   --name torrent-speedtest \
   --restart unless-stopped \
-  -p 8080:8080 \
+  -p 80.0.9080 \
   -p 51413:51413 \
   -p 51413:51413/udp \
   -e PUBLIC_HOST=speedtest.fio.ie \
