@@ -1,5 +1,9 @@
 # BitTorrent Speed Test Container
 
+<p align="center">
+  <img src=".github/logo.png" alt="torrent-speedtest logo" width="128" />
+</p>
+
 A containerized, self-hosted BitTorrent speed test platform. It packages a **5 GB non-compressible dummy payload generator**, an **embedded BitTorrent HTTP tracker**, a **modern Web UI**, and an **uncapped Transmission seeder daemon** into a single lightweight image.
 
 Designed for testing and saturating high-bandwidth network pipes (e.g. 1 Gbps – 10 Gbps) on public cloud VPS servers (such as `fio.ie`).
@@ -119,9 +123,9 @@ flowchart TD
 
 Ensure the following ports are open on your VPS firewall (e.g., `ufw`, `iptables`, cloud security group):
 
-| Port | Protocol | Purpose |
-|---|---|---|
-| **8080** | TCP | Web UI & BitTorrent HTTP Tracker (`/announce`) |
+| Port      | Protocol  | Purpose                                             |
+| --------- | --------- | --------------------------------------------------- |
+| **8080**  | TCP       | Web UI & BitTorrent HTTP Tracker (`/announce`)      |
 | **51413** | TCP & UDP | BitTorrent peer wire transfer (Transmission Seeder) |
 
 ---
@@ -136,7 +140,8 @@ podman build -t torrent-speedtest .
 
 ### 2. Run the Container
 
-#### With Auto-Detected Public IP:
+#### With Auto-Detected Public IP
+
 ```bash
 podman run -d \
   --name torrent-speedtest \
@@ -148,7 +153,8 @@ podman run -d \
   torrent-speedtest
 ```
 
-#### With Custom Domain / VPS IP:
+#### With Custom Domain / VPS IP
+
 ```bash
 podman run -d \
   --name torrent-speedtest \
@@ -184,14 +190,14 @@ podman-compose up -d
 
 Set these environment variables when running the container:
 
-| Variable | Default | Description |
-|---|---|---|
-| `PUBLIC_HOST` | `auto` | Public IP or domain name of your VPS. If `auto`, the container queries external IP APIs (`ipify`, `ifconfig.me`) on boot. |
-| `HTTP_PORT` | `8080` | Port for the Web UI and HTTP tracker announce endpoint. |
-| `PEER_PORT` | `51413` | Port for Transmission peer connections (TCP & UDP). |
-| `FILE_SIZE_GB` | `5.0` | Size in GB of the dummy test payload. |
-| `PIECE_SIZE_MB` | `4` | Piece size in MB for the `.torrent` file. |
-| `DATA_DIR` | `/data` | Directory where the test binary and `.torrent` file are stored. |
+| Variable        | Default | Description                                                                                                               |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_HOST`   | `auto`  | Public IP or domain name of your VPS. If `auto`, the container queries external IP APIs (`ipify`, `ifconfig.me`) on boot. |
+| `HTTP_PORT`     | `8080`  | Port for the Web UI and HTTP tracker announce endpoint.                                                                   |
+| `PEER_PORT`     | `51413` | Port for Transmission peer connections (TCP & UDP).                                                                       |
+| `FILE_SIZE_GB`  | `5.0`   | Size in GB of the dummy test payload.                                                                                     |
+| `PIECE_SIZE_MB` | `4`     | Piece size in MB for the `.torrent` file.                                                                                 |
+| `DATA_DIR`      | `/data` | Directory where the test binary and `.torrent` file are stored.                                                           |
 
 ---
 
