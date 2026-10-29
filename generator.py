@@ -4,7 +4,6 @@ Generates dummy test data and the corresponding BitTorrent .torrent file.
 import hashlib
 import json
 import os
-import sys
 import time
 from typing import Dict, Any
 
@@ -48,7 +47,7 @@ def generate_test_file_and_torrent(
 
     pieces_hashes = bytearray()
     bytes_written = 0
-    current_piece_hasher = hashlib.sha1()
+    current_piece_hasher = hashlib.sha1(usedforsecurity=False)
     current_piece_bytes = 0
 
     with open(file_path, "wb") as f:
@@ -72,7 +71,7 @@ def generate_test_file_and_torrent(
 
                 if current_piece_bytes == piece_length:
                     pieces_hashes.extend(current_piece_hasher.digest())
-                    current_piece_hasher = hashlib.sha1()
+                    current_piece_hasher = hashlib.sha1(usedforsecurity=False)
                     current_piece_bytes = 0
 
             bytes_written += to_write
@@ -101,8 +100,7 @@ def generate_test_file_and_torrent(
 
     # Compute info_hash
     bencoded_info = bencode.bencode(info_dict)
-    info_hash_bytes = hashlib.sha1(bencoded_info).digest()
-    info_hash_hex = hashlib.sha1(bencoded_info).hexdigest()
+    info_hash_hex = hashlib.sha1(bencoded_info, usedforsecurity=False).hexdigest()
 
     torrent_dict = {
         "announce": announce_url,
@@ -134,7 +132,7 @@ def generate_test_file_and_torrent(
     with open(meta_json_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
 
-    print(f"[+] Torrent created successfully!")
+    print("[+] Torrent created successfully!")
     print(f"    Info Hash: {info_hash_hex}")
     print(f"    Torrent:   {torrent_path}")
     print(f"    Pieces:    {len(pieces_hashes) // 20} x {piece_size_mb}MB")
