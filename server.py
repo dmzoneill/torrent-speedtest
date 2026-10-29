@@ -1,16 +1,17 @@
 """
 Unified Web UI and BitTorrent Tracker Server for Torrent Speed Test.
 """
+
 import http.server
 import json
 import os
 import re
 import socket
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Dict, Optional
+from collections.abc import Callable
+from typing import ClassVar
 
 import bencode
 from tracker import Tracker
@@ -41,7 +42,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                Helvetica, Arial, sans-serif;
         }
 
         body {
@@ -259,19 +261,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
             <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-                Download the <strong>5 GB</strong> dummy torrent or import via Magnet link into any standard client (qBittorrent, Transmission, Deluge, etc.).
+                Download the <strong>5 GB</strong> dummy torrent or import via Magnet link
+                into any standard client (qBittorrent, Transmission, Deluge, etc.).
             </p>
 
             <div class="actions">
                 <a href="/speedtest-5gb.torrent" class="btn btn-primary" id="download-torrent-btn">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    <svg width="20" height="20" fill="none" stroke="currentColor"
+                        stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
+                        </path>
                     </svg>
                     Download 5GB .torrent
                 </a>
                 <button class="btn btn-secondary" onclick="copyMagnet()">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    <svg width="20" height="20" fill="none" stroke="currentColor"
+                        stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101
+                               m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1">
+                        </path>
                     </svg>
                     Copy Magnet Link
                 </button>
@@ -284,12 +294,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="stats-grid">
                 <div class="stat-item">
                     <div class="stat-label">Current Seeding Speed</div>
-                    <div class="stat-value" id="stat-speed">0.0 <span class="stat-unit">MB/s</span></div>
-                    <div class="stat-unit" id="stat-speed-mbps" style="margin-top: 0.2rem;">0 Mbps</div>
+                    <div class="stat-value" id="stat-speed">
+                        0.0 <span class="stat-unit">MB/s</span>
+                    </div>
+                    <div class="stat-unit" id="stat-speed-mbps" style="margin-top: 0.2rem;">
+                        0 Mbps
+                    </div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-label">Total Uploaded</div>
-                    <div class="stat-value" id="stat-uploaded">0.0 <span class="stat-unit">GB</span></div>
+                    <div class="stat-value" id="stat-uploaded">
+                        0.0 <span class="stat-unit">GB</span>
+                    </div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-label">Active Leechers</div>
@@ -308,7 +324,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <li>Click <strong>Download 5GB .torrent</strong> or copy the Magnet Link.</li>
                 <li>Open your BitTorrent client and add the torrent.</li>
                 <li>Verify the tracker status shows <code>Working / OK</code>.</li>
-                <li>Observe your client's maximum download speed graph as it saturates the connection!</li>
+                <li>
+                    Observe your client's maximum download speed graph as it
+                    saturates the connection!
+                </li>
                 <li>When the download finishes, remove the dummy file from your disk.</li>
             </ol>
         </div>
@@ -359,22 +378,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const speedBytes = data.transmission?.uploadSpeed || 0;
                 const speedMB = (speedBytes / (1024 * 1024)).toFixed(2);
                 const speedMbps = ((speedBytes * 8) / 1000000).toFixed(1);
-                document.getElementById('stat-speed').innerHTML = `${speedMB} <span class="stat-unit">MB/s</span>`;
+                document.getElementById('stat-speed').innerHTML =
+                    `${speedMB} <span class="stat-unit">MB/s</span>`;
                 document.getElementById('stat-speed-mbps').textContent = `${speedMbps} Mbps`;
 
                 // Total uploaded
                 const totalBytes = data.transmission?.['cumulative-stats']?.uploadedBytes || 0;
                 const totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(2);
-                document.getElementById('stat-uploaded').innerHTML = `${totalGB} <span class="stat-unit">GB</span>`;
+                document.getElementById('stat-uploaded').innerHTML =
+                    `${totalGB} <span class="stat-unit">GB</span>`;
 
                 // Leechers & Peers
                 const leechers = data.tracker?.active_leechers || 0;
                 document.getElementById('stat-leechers').textContent = leechers;
 
                 // Host & Info
-                document.getElementById('info-host').textContent = data.network?.public_host || window.location.hostname;
-                document.getElementById('info-announce').textContent = data.network?.announce_url || (window.location.origin + '/announce');
-                document.getElementById('info-hash').textContent = data.metadata?.info_hash_hex || 'N/A';
+                document.getElementById('info-host').textContent =
+                    data.network?.public_host || window.location.hostname;
+                document.getElementById('info-announce').textContent =
+                    data.network?.announce_url || (window.location.origin + '/announce');
+                document.getElementById('info-hash').textContent =
+                    data.metadata?.info_hash_hex || 'N/A';
 
                 currentMagnet = data.metadata?.magnet_uri || '';
             } catch (err) {
@@ -401,9 +425,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 
-def parse_tracker_query(raw_query: str) -> Dict[str, bytes]:
-    """Parse query string while preserving raw bytes (critical for info_hash and peer_id)."""
-    params: Dict[str, bytes] = {}
+def parse_tracker_query(raw_query: str) -> dict[str, bytes]:
+    """Parse a query string, preserving raw bytes (needed for info_hash/peer_id)."""
+    params: dict[str, bytes] = {}
     for part in raw_query.split("&"):
         if not part:
             continue
@@ -417,34 +441,39 @@ def parse_tracker_query(raw_query: str) -> Dict[str, bytes]:
 
 def detect_public_ip() -> str:
     """Attempt auto-detection of public IP from external service."""
-    endpoints = ["https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"]
+    endpoints = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com",
+    ]
     for url in endpoints:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "curl/7.68.0"})
             with urllib.request.urlopen(req, timeout=2.5) as resp:
                 ip = resp.read().decode("utf-8").strip()
-                if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip):
-                    return ip
-        except Exception:
-            continue
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"[!] Public IP lookup via {url} failed: {e}")
+            ip = ""
+        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip):
+            return ip
     return "127.0.0.1"
 
 
 class SpeedtestServer:
+    """Holds server state: metadata, tracker and the Transmission seeder."""
+
     def __init__(
         self,
         data_dir: str = "/data",
-        http_host: str = "0.0.0.0",
         http_port: int = 8080,
-        public_host: Optional[str] = None,
+        public_host: str | None = None,
         seeder_port: int = 51413,
         transmission_rpc_url: str = "http://127.0.0.1:9091/transmission/rpc",
     ):
         self.data_dir = data_dir
-        self.http_host = http_host
         self.http_port = http_port
-        self.seeder_port = seeder_port
         self.transmission = TransmissionClient(transmission_rpc_url)
+        self.metadata: dict = {}
 
         # Resolve public host/IP
         if not public_host or public_host.lower() in ("auto", "0.0.0.0"):
@@ -456,23 +485,39 @@ class SpeedtestServer:
 
         # Resolve IPv4 for tracker peer list
         try:
-            self.seeder_ip = socket.gethostbyname(self.public_host)
-        except socket.error:
-            self.seeder_ip = self.public_host
+            seeder_ip = socket.gethostbyname(self.public_host)
+        except OSError:
+            seeder_ip = self.public_host
 
-        print(f"[*] Initialized Seeder at {self.seeder_ip}:{self.seeder_port}")
-        self.tracker = Tracker(seeder_ip=self.seeder_ip, seeder_port=self.seeder_port)
+        print(f"[*] Initialized Seeder at {seeder_ip}:{seeder_port}")
+        self.tracker = Tracker(seeder_ip=seeder_ip, seeder_port=seeder_port)
         self.load_metadata()
         self.ensure_seeding()
 
+    @property
+    def seeder_ip(self) -> str:
+        """IP address advertised for the seeder."""
+        return self.tracker.seeder_ip
+
+    @property
+    def seeder_port(self) -> int:
+        """Peer port advertised for the seeder."""
+        return self.tracker.seeder_port
+
+    @property
+    def announce_url(self) -> str:
+        """Public tracker announce URL."""
+        return f"http://{self.public_host}:{self.http_port}/announce"
+
     def load_metadata(self):
+        """Load the generated speed test metadata, if present."""
         meta_path = os.path.join(self.data_dir, "speedtest-info.json")
         self.metadata = {}
         if os.path.exists(meta_path):
             try:
                 with open(meta_path, "r", encoding="utf-8") as f:
                     self.metadata = json.load(f)
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 print(f"[!] Warning: Failed reading {meta_path}: {e}")
 
     def ensure_seeding(self):
@@ -489,9 +534,8 @@ class SpeedtestServer:
                 self.transmission.verify_all()
                 self.transmission.start_all()
                 print("[+] Torrent added and primed in Transmission.")
-        except Exception as e:
+        except (OSError, ValueError) as e:
             print(f"[!] Warning during Transmission prime: {e}")
-
 
     def get_dynamic_torrent_bytes(self, client_host: str) -> bytes:
         """Returns .torrent bytes with announce URL adjusted to the requested Host."""
@@ -504,8 +548,10 @@ class SpeedtestServer:
 
         try:
             torrent_dict = bencode.bdecode(raw)
-            # Use public_host if set to real domain/IP, otherwise use incoming request Host header
-            effective_host = self.public_host if self.public_host not in ("127.0.0.1", "localhost") else client_host
+            # Use public_host if it is a real domain/IP, else the request Host header
+            effective_host = self.public_host
+            if effective_host in ("127.0.0.1", "localhost"):
+                effective_host = client_host
             if ":" not in effective_host and self.http_port not in (80, 443):
                 announce_host = f"{effective_host}:{self.http_port}"
             else:
@@ -513,135 +559,131 @@ class SpeedtestServer:
 
             torrent_dict["announce"] = f"http://{announce_host}/announce"
             return bencode.bencode(torrent_dict)
-        except Exception as e:
+        except (ValueError, TypeError, IndexError) as e:
             print(f"[!] Error adjusting torrent announce: {e}")
             return raw
 
+    def stats_payload(self) -> dict:
+        """Build the JSON payload served by /api/stats."""
+        meta = dict(self.metadata)
+        announce_url = self.announce_url
+        if meta.get("info_hash_hex"):
+            file_name = meta.get("file_name", "speedtest-5gb.bin")
+            tracker = urllib.parse.quote(announce_url)
+            magnet = f"magnet:?xt=urn:btih:{meta['info_hash_hex']}&dn={file_name}"
+            meta["magnet_uri"] = f"{magnet}&tr={tracker}"
+        return {
+            "network": {
+                "public_host": self.public_host,
+                "seeder_ip": self.seeder_ip,
+                "seeder_port": self.seeder_port,
+                "http_port": self.http_port,
+                "announce_url": announce_url,
+            },
+            "transmission": self.transmission.get_session_stats(),
+            "tracker": self.tracker.get_stats(),
+            "metadata": meta,
+        }
+
 
 def make_request_handler(server_instance: SpeedtestServer):
+    """Create the HTTP handler class bound to a SpeedtestServer instance."""
+
     class SpeedtestHTTPHandler(http.server.BaseHTTPRequestHandler):
-        def log_message(self, format, *args):
+        """Serves the web UI, the .torrent file, tracker endpoints and stats."""
+
+        def log_request(self, code="-", size="-"):
             # Suppress normal tracker polling spam from terminal
-            if "/api/stats" in str(args[0]) or "/announce" in str(args[0]):
+            if "/api/stats" in self.requestline or "/announce" in self.requestline:
                 return
-            super().log_message(format, *args)
+            super().log_request(code, size)
 
-        def do_GET(self):
-            parsed = urllib.parse.urlparse(self.path)
-            path = parsed.path
-            query_str = parsed.query
+        def _send_body(self, content_type: str, body: bytes, extra=None):
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            for name, value in (extra or {}).items():
+                self.send_header(name, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
+        def _serve_index(self, _query: str):
+            self._send_body("text/html; charset=utf-8", HTML_TEMPLATE.encode("utf-8"))
+
+        def _serve_torrent(self, _query: str):
+            default_host = f"localhost:{server_instance.http_port}"
+            host_hdr = self.headers.get("Host", default_host)
+            torrent_bytes = server_instance.get_dynamic_torrent_bytes(host_hdr)
+            if not torrent_bytes:
+                self.send_error(404, "Torrent file not generated yet")
+                return
+            self._send_body(
+                "application/x-bittorrent",
+                torrent_bytes,
+                {"Content-Disposition": 'attachment; filename="speedtest-5gb.torrent"'},
+            )
+
+        def _serve_announce(self, query: str):
+            params = parse_tracker_query(query)
             client_ip = self.client_address[0]
-            host_hdr = self.headers.get("Host", f"localhost:{server_instance.http_port}")
+            resp_bytes = server_instance.tracker.handle_announce(params, client_ip)
+            self._send_body("text/plain", resp_bytes)
 
-            # 1. Main Web UI
-            if path == "/" or path == "/index.html":
-                content = HTML_TEMPLATE.encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
-                return
+        def _serve_scrape(self, query: str):
+            params = parse_tracker_query(query)
+            resp_bytes = server_instance.tracker.handle_scrape(params)
+            self._send_body("text/plain", resp_bytes)
 
-            # 2. Download .torrent file
-            elif path in ("/speedtest-5gb.torrent", "/speedtest.torrent"):
-                torrent_bytes = server_instance.get_dynamic_torrent_bytes(host_hdr)
-                if not torrent_bytes:
-                    self.send_error(404, "Torrent file not generated yet")
-                    return
-                self.send_response(200)
-                self.send_header("Content-Type", "application/x-bittorrent")
-                self.send_header("Content-Disposition", 'attachment; filename="speedtest-5gb.torrent"')
-                self.send_header("Content-Length", str(len(torrent_bytes)))
-                self.end_headers()
-                self.wfile.write(torrent_bytes)
-                return
+        def _serve_stats(self, _query: str):
+            resp_body = json.dumps(server_instance.stats_payload()).encode("utf-8")
+            self._send_body(
+                "application/json",
+                resp_body,
+                {"Access-Control-Allow-Origin": "*"},
+            )
 
-            # 3. BitTorrent HTTP Tracker Announce
-            elif path == "/announce":
-                params = parse_tracker_query(query_str)
-                resp_bytes = server_instance.tracker.handle_announce(params, client_ip)
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(resp_bytes)))
-                self.end_headers()
-                self.wfile.write(resp_bytes)
-                return
+        def _serve_health(self, _query: str):
+            self._send_body("text/plain", b"OK")
 
-            # 4. BitTorrent Scrape
-            elif path == "/scrape":
-                params = parse_tracker_query(query_str)
-                resp_bytes = server_instance.tracker.handle_scrape(params)
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(resp_bytes)))
-                self.end_headers()
-                self.wfile.write(resp_bytes)
-                return
+        routes: ClassVar[dict[str, Callable[..., None]]] = {
+            "/": _serve_index,
+            "/index.html": _serve_index,
+            "/speedtest-5gb.torrent": _serve_torrent,
+            "/speedtest.torrent": _serve_torrent,
+            "/announce": _serve_announce,
+            "/scrape": _serve_scrape,
+            "/api/stats": _serve_stats,
+            "/health": _serve_health,
+        }
 
-            # 5. Live Stats API
-            elif path == "/api/stats":
-                trans_stats = server_instance.transmission.get_session_stats()
-                tracker_stats = server_instance.tracker.get_stats()
-                meta = dict(server_instance.metadata)
-
-                announce_url = f"http://{server_instance.public_host}:{server_instance.http_port}/announce"
-                if meta.get("info_hash_hex"):
-                    meta["magnet_uri"] = f"magnet:?xt=urn:btih:{meta['info_hash_hex']}&dn={meta.get('file_name', 'speedtest-5gb.bin')}&tr={urllib.parse.quote(announce_url)}"
-
-                data = {
-                    "network": {
-                        "public_host": server_instance.public_host,
-                        "seeder_ip": server_instance.seeder_ip,
-                        "seeder_port": server_instance.seeder_port,
-                        "http_port": server_instance.http_port,
-                        "announce_url": announce_url,
-                    },
-                    "transmission": trans_stats,
-                    "tracker": tracker_stats,
-                    "metadata": meta,
-                }
-                resp_body = json.dumps(data).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(resp_body)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(resp_body)
-                return
-
-            # 6. Health check
-            elif path == "/health":
-                body = b"OK"
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
-
-            else:
+        def handle_get(self):
+            """Dispatch a GET request to its route handler."""
+            parsed = urllib.parse.urlparse(self.path)
+            route = self.routes.get(parsed.path)
+            if route is None:
                 self.send_error(404, "Not Found")
+                return
+            route(self, parsed.query)
+
+        do_GET = handle_get
 
     return SpeedtestHTTPHandler
 
 
 def run_server():
-    data_dir = os.environ.get("DATA_DIR", "/data")
+    """Start the web UI and tracker HTTP server."""
     http_host = os.environ.get("HTTP_HOST", "0.0.0.0")
     http_port = int(os.environ.get("HTTP_PORT", "8080"))
-    public_host = os.environ.get("PUBLIC_HOST")
     seeder_port = int(os.environ.get("PEER_PORT", "51413"))
-    transmission_rpc = os.environ.get("TRANSMISSION_RPC_URL", "http://127.0.0.1:9091/transmission/rpc")
+    default_rpc = "http://127.0.0.1:9091/transmission/rpc"
+    rpc_url = os.environ.get("TRANSMISSION_RPC_URL", default_rpc)
 
     server_instance = SpeedtestServer(
-        data_dir=data_dir,
-        http_host=http_host,
+        data_dir=os.environ.get("DATA_DIR", "/data"),
         http_port=http_port,
-        public_host=public_host,
+        public_host=os.environ.get("PUBLIC_HOST"),
         seeder_port=seeder_port,
-        transmission_rpc_url=transmission_rpc,
+        transmission_rpc_url=rpc_url,
     )
 
     handler_class = make_request_handler(server_instance)
@@ -649,7 +691,7 @@ def run_server():
 
     print(f"[+] Speed Test Web UI & Tracker running on http://{http_host}:{http_port}")
     print(f"[+] Seeder Wire Port: {seeder_port}")
-    print(f"[+] Public Announce: http://{server_instance.public_host}:{http_port}/announce")
+    print(f"[+] Public Announce: {server_instance.announce_url}")
 
     try:
         httpd.serve_forever()

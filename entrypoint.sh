@@ -22,7 +22,7 @@ mkdir -p "${DATA_DIR}"
 mkdir -p /app/transmission-config
 
 # Configure Transmission Daemon
-cat <<EOF > /app/transmission-config/settings.json
+cat <<EOF >/app/transmission-config/settings.json
 {
     "rpc-enabled": true,
     "rpc-port": 9091,
@@ -56,11 +56,11 @@ TRANS_PID=$!
 # Wait for Transmission RPC to be ready
 echo "[*] Waiting for Transmission RPC..."
 for _ in $(seq 1 15); do
-    if curl -s http://127.0.0.1:9091/transmission/rpc >/dev/null 2>&1 || [ $? -eq 409 ]; then
-        echo "[+] Transmission RPC is ready."
-        break
-    fi
-    sleep 1
+	if curl -s http://127.0.0.1:9091/transmission/rpc >/dev/null 2>&1 || [ $? -eq 409 ]; then
+		echo "[+] Transmission RPC is ready."
+		break
+	fi
+	sleep 1
 done
 
 # Generate test dummy data and .torrent if needed
@@ -76,12 +76,11 @@ python3 /app/generator.py
 
 echo "[+] Test payload and torrent checked."
 
-
 # Trap to gracefully stop transmission on container exit
 cleanup() {
-    echo "[*] Container stopping, terminating transmission..."
-    kill -TERM "${TRANS_PID}" 2>/dev/null || true
-    wait "${TRANS_PID}" 2>/dev/null || true
+	echo "[*] Container stopping, terminating transmission..."
+	kill -TERM "${TRANS_PID}" 2>/dev/null || true
+	wait "${TRANS_PID}" 2>/dev/null || true
 }
 trap cleanup SIGTERM SIGINT
 
