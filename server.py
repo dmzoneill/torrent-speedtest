@@ -6,14 +6,11 @@ import json
 import os
 import re
 import socket
-import struct
-import sys
-import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import bencode
 from tracker import Tracker

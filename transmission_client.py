@@ -4,6 +4,7 @@ Uses Python standard library only.
 """
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, Optional
 
@@ -19,8 +20,11 @@ class TransmissionClient:
         if self.session_id:
             req.add_header("X-Transmission-Session-Id", self.session_id)
 
+        if urllib.parse.urlparse(self.rpc_url).scheme not in ("http", "https"):
+            raise ValueError(f"Unsupported RPC URL scheme: {self.rpc_url}")
+
         try:
-            with urllib.request.urlopen(req, timeout=3) as resp:
+            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310 - scheme validated above
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 409:

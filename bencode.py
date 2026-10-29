@@ -2,7 +2,7 @@
 Lightweight, pure-Python Bencode encoder and decoder.
 Follows the BitTorrent BEP 0003 specification.
 """
-from typing import Any, Tuple, Union
+from typing import Any, Tuple
 
 
 def bencode(val: Any) -> bytes:

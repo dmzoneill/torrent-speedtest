@@ -55,7 +55,7 @@ TRANS_PID=$!
 
 # Wait for Transmission RPC to be ready
 echo "[*] Waiting for Transmission RPC..."
-for i in $(seq 1 15); do
+for _ in $(seq 1 15); do
     if curl -s http://127.0.0.1:9091/transmission/rpc >/dev/null 2>&1 || [ $? -eq 409 ]; then
         echo "[+] Transmission RPC is ready."
         break
