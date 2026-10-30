@@ -525,15 +525,19 @@ class SpeedtestServer:
         torrent_file = self.metadata.get("torrent_file")
         if not torrent_file:
             return
-        # The metadata file is external input: only accept a torrent that lives
-        # inside the data directory (the generator always writes it there).
-        data_root = os.path.realpath(self.data_dir)
-        torrent_file = os.path.realpath(torrent_file)
-        if os.path.commonpath([data_root, torrent_file]) != data_root:
-            print(f"[!] Warning: Ignoring torrent outside {data_root}: {torrent_file}")
+        # The metadata file is external input: never touch the path it names.
+        # Only accept a torrent file that actually exists in the data directory
+        # (the generator always writes it there) and use that directory entry.
+        wanted = os.path.basename(torrent_file)
+        try:
+            entries = os.listdir(self.data_dir)
+        except OSError:
             return
-        if not os.path.isfile(torrent_file):
+        matches = [e for e in entries if e == wanted and e.endswith(".torrent")]
+        if not matches:
+            print(f"[!] Warning: Ignoring torrent not found in {self.data_dir}")
             return
+        torrent_file = os.path.join(self.data_dir, matches[0])
         try:
             torrents = self.transmission.get_torrents()
             if not torrents:
