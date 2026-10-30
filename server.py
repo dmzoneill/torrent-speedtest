@@ -525,8 +525,21 @@ class SpeedtestServer:
     def ensure_seeding(self):
         """Ensures the speed test torrent is added and seeding in Transmission."""
         torrent_file = self.metadata.get("torrent_file")
-        if not torrent_file or not os.path.exists(torrent_file):
+        if not torrent_file:
             return
+        # The metadata file is external input: never touch the path it names.
+        # Only accept a torrent file that actually exists in the data directory
+        # (the generator always writes it there) and use that directory entry.
+        wanted = os.path.basename(torrent_file)
+        try:
+            entries = os.listdir(self.data_dir)
+        except OSError:
+            return
+        matches = [e for e in entries if e == wanted and e.endswith(".torrent")]
+        if not matches:
+            print(f"[!] Warning: Ignoring torrent not found in {self.data_dir}")
+            return
+        torrent_file = os.path.join(self.data_dir, matches[0])
         try:
             torrents = self.transmission.get_torrents()
             if not torrents:
