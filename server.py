@@ -523,7 +523,16 @@ class SpeedtestServer:
     def ensure_seeding(self):
         """Ensures the speed test torrent is added and seeding in Transmission."""
         torrent_file = self.metadata.get("torrent_file")
-        if not torrent_file or not os.path.exists(torrent_file):
+        if not torrent_file:
+            return
+        # The metadata file is external input: only accept a torrent that lives
+        # inside the data directory (the generator always writes it there).
+        data_root = os.path.realpath(self.data_dir)
+        torrent_file = os.path.realpath(torrent_file)
+        if os.path.commonpath([data_root, torrent_file]) != data_root:
+            print(f"[!] Warning: Ignoring torrent outside {data_root}: {torrent_file}")
+            return
+        if not os.path.isfile(torrent_file):
             return
         try:
             torrents = self.transmission.get_torrents()
