@@ -449,7 +449,8 @@ def detect_public_ip() -> str:
     for url in endpoints:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "curl/7.68.0"})
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            # Endpoints are hard-coded https:// URLs above.
+            with urllib.request.urlopen(req, timeout=2.5) as resp:  # nosec B310
                 ip = resp.read().decode("utf-8").strip()
         except (OSError, UnicodeDecodeError) as e:
             print(f"[!] Public IP lookup via {url} failed: {e}")
@@ -476,7 +477,8 @@ class SpeedtestServer:
         self.metadata: dict = {}
 
         # Resolve public host/IP
-        if not public_host or public_host.lower() in ("auto", "0.0.0.0"):
+        # "0.0.0.0" is a sentinel for auto-detection, not a bind address.
+        if not public_host or public_host.lower() in ("auto", "0.0.0.0"):  # nosec B104
             print("[*] Detecting public IP...")
             self.public_host = detect_public_ip()
             print(f"[+] Detected public IP: {self.public_host}")
@@ -672,7 +674,9 @@ def make_request_handler(server_instance: SpeedtestServer):
 
 def run_server():
     """Start the web UI and tracker HTTP server."""
-    http_host = os.environ.get("HTTP_HOST", "0.0.0.0")
+    # Binding all interfaces is intended (containerised server reachable by
+    # peers); set HTTP_HOST to restrict.
+    http_host = os.environ.get("HTTP_HOST", "0.0.0.0")  # nosec B104
     http_port = int(os.environ.get("HTTP_PORT", "8080"))
     seeder_port = int(os.environ.get("PEER_PORT", "51413"))
     default_rpc = "http://127.0.0.1:9091/transmission/rpc"

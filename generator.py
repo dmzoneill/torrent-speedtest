@@ -123,7 +123,10 @@ def _write_torrent(spec: SpeedtestSpec, torrent_path: str, pieces: bytes) -> str
         "private": 1,
     }
     bencoded_info = bencode.bencode(info_dict)
-    info_hash_hex = hashlib.sha1(bencoded_info, usedforsecurity=False).hexdigest()
+    # SHA-1 info hash is mandated by BitTorrent v1 (BEP 3), not security.
+    info_hash_hex = hashlib.sha1(  # nosemgrep
+        bencoded_info, usedforsecurity=False
+    ).hexdigest()
 
     torrent_dict = {
         "announce": spec.announce_url,

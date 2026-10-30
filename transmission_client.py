@@ -35,8 +35,8 @@ class TransmissionClient:
             raise ValueError(f"Unsupported RPC URL scheme: {self.rpc_url}")
 
         try:
-            # nosec B310 - scheme validated above
-            with urllib.request.urlopen(req, timeout=3) as resp:
+            # Scheme validated above (http/https only).
+            with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 409:
@@ -51,7 +51,7 @@ class TransmissionClient:
                             "X-Transmission-Session-Id": self.session_id,
                         },
                     )
-                    with urllib.request.urlopen(req, timeout=3) as resp:
+                    with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                         return json.loads(resp.read().decode("utf-8"))
             raise
 
