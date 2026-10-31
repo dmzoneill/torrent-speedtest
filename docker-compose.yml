@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Containerfile
+      network: host
     image: localhost/torrent-speedtest:latest
     container_name: torrent-speedtest
     restart: unless-stopped
